@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>brush-jayupet</title>
+  <meta name="application-name" content="brush-jayupet">
+  <meta name="apple-mobile-web-app-title" content="brush-jayupet">
+  <meta name="description" content="Brush your dog's teeth and climb the JAYU PET ranking.">
+  <meta name="theme-color" content="#bd1e2d">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="JAYU PET">
+  <meta property="og:title" content="brush-jayupet">
+  <meta property="og:description" content="Brush your dog's teeth and climb the ranking.">
+  <meta property="og:image" content="asset/images/gameplay-preview.png">
+  <meta property="og:image:width" content="1406">
+  <meta property="og:image:height" content="1316">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="brush-jayupet">
+  <meta name="twitter:image" content="asset/images/gameplay-preview.png">
+  <link rel="icon" type="image/png" href="asset/images/jayupet-logo-round.png">
+  <link rel="apple-touch-icon" href="asset/images/jayupet-logo-round.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0;background:#17120e;color:#fff;font-family:system-ui,sans-serif;overflow:hidden}
+    #game{position:relative;width:100%;height:100%;touch-action:none;user-select:none;background:#f7ead2}
+    .photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none}
+    #basePhoto{z-index:0}
+    #dirtCanvas{z-index:1;filter:saturate(1.4) contrast(1.18)}
+    #basePhoto,#dirtCanvas{transform:scale(var(--dog-display-scale,1.55));transform-origin:center}
+    .warning-photo{z-index:2}
+    .warning-photo{opacity:0}
+    #gameLogo{display:none;position:absolute;z-index:4;pointer-events:none;object-fit:contain;will-change:transform}
+    #score{position:absolute;top:24px;left:28px;font-size:clamp(44px,8vw,88px);font-weight:300;color:#777;text-shadow:0 1px #fff;z-index:4}
+    #brush{position:absolute;width:auto;height:clamp(270px,44vh,410px);transform:translate(-50%,-28%) rotate(-50deg);transform-origin:50% 28%;pointer-events:none;z-index:5;filter:drop-shadow(0 3px 4px rgba(45,28,18,.18))}
+    #warning{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 0 0 #c33;z-index:3}
+    #game.warning #basePhoto{opacity:0}
+    #game.warning #dirtCanvas{opacity:0}
+    #game.warning .warning-photo.active{opacity:1}
+    #game.warning .warning-photo.active{animation:headShake 180ms infinite alternate ease-in-out;transform-origin:58% 44%}
+    #game.warning #warning{opacity:1;animation:pulse 320ms infinite alternate}
+    #phaseMeal{position:absolute;inset:0;display:none;pointer-events:none;z-index:6}
+    #game.eating #phaseMeal{display:block}
+    #game.eating #brush{opacity:0}
+    #phasePhoto{z-index:2;opacity:0}
+    #game.eating #basePhoto,#game.eating #dirtCanvas{opacity:0}
+    #game.eating #phasePhoto{opacity:1;animation:eatingChew 1050ms ease-in-out both;transform-origin:58% 61%}
+    .food-bit{position:absolute;left:var(--mouth-x);top:var(--mouth-y);width:clamp(13px,1.8vw,22px);height:clamp(13px,1.8vw,22px);border-radius:48% 52% 44% 56%;opacity:0;background:radial-gradient(circle at 35% 28%,#e9b55c 0 14%,#a86122 58%,#704019 100%);box-shadow:inset -2px -2px 4px #5a2f1770,0 2px 5px #43220d55;animation:foodFly 760ms var(--delay) cubic-bezier(.35,.04,.65,.98) forwards}
+    .food-bit.carrot{width:clamp(10px,1.4vw,17px);height:clamp(17px,2.3vw,27px);border-radius:5px;background:linear-gradient(135deg,#ffae32,#e65f16)}
+    .food-bit.green{width:clamp(11px,1.5vw,18px);height:clamp(11px,1.5vw,18px);border-radius:5px;background:linear-gradient(135deg,#a8c845,#448f27)}
+    #kissAttack{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:0;pointer-events:none;z-index:8;transform:scale(.58);transform-origin:50% 68%}
+    #game.kiss-fail #kissAttack{opacity:1;animation:kissRush 620ms linear forwards}
+    #game.kiss-fail #brush{opacity:0;transition:opacity 80ms}
+    #lensSmear{position:absolute;left:50%;top:50%;width:115vmax;max-width:none;height:auto;opacity:0;pointer-events:none;z-index:9;transform:translate(-50%,-50%) scale(.7);transform-origin:center;filter:drop-shadow(0 2px 5px rgba(76,52,25,.1))}
+    #game.kiss-fail #lensSmear{animation:smearPop 190ms 550ms cubic-bezier(.18,.86,.25,1.2) forwards}
+    @keyframes headShake{
+      0%{transform:translate(-9px,1px) rotate(-1.1deg) scale(1.5686)}
+      100%{transform:translate(9px,-1px) rotate(1.1deg) scale(1.5686)}
+    }
+    @keyframes pulse{to{box-shadow:inset 0 0 55px 10px #a3121266}}
+    @keyframes eatingChew{
+      0%,18%{transform:translateX(0) rotate(0) scale(1.55)}
+      33%{transform:translateX(-8px) rotate(-.45deg) scale(1.5624)}
+      48%{transform:translateX(8px) rotate(.45deg) scale(1.5686)}
+      63%{transform:translateX(-6px) rotate(-.35deg) scale(1.5655)}
+      78%{transform:translateX(6px) rotate(.35deg) scale(1.5686)}
+      100%{transform:translateX(0) rotate(0) scale(1.55)}
+    }
+    @keyframes foodFly{0%{opacity:0;transform:translate(var(--sx),var(--sy)) rotate(0) scale(.75)}12%{opacity:1}78%{opacity:1}100%{opacity:0;transform:translate(0,0) rotate(390deg) scale(.12)}}
+    @keyframes kissRush{
+      0%{transform:scale(.58);filter:blur(1px);animation-timing-function:cubic-bezier(.48,.02,.82,.42)}
+      90%{transform:scale(3.18);filter:blur(0);animation-timing-function:cubic-bezier(.2,.75,.35,1)}
+      100%{transform:scale(3.22) scaleX(1.025) scaleY(.975);filter:blur(.45px)}
+    }
+    @keyframes smearPop{
+      0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+      68%{opacity:.76;transform:translate(-50%,-50%) scale(1.05)}
+      100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
+    }
+    #fail{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(circle at 50% 18%,#fff9ed 0,#f8e7c9 52%,#efc89f 100%);color:#55311f;text-align:center;padding:clamp(10px,3vw,24px);z-index:10}
+    #fail.show{display:flex}
+    .result-card{position:relative;width:min(680px,94vw);max-height:94vh;padding:clamp(16px,3.2vh,30px) clamp(18px,4vw,42px);border:3px solid #ed5538;border-radius:28px;background:#fffaf2f2;box-shadow:0 18px 45px #8b492d33}
+    #shareResult{position:absolute;top:12px;right:12px;width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:50%;background:#fff;color:#9d4330;box-shadow:0 3px 12px #6d351e26;cursor:pointer}#shareResult svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+    .result-logo{display:block;width:clamp(116px,20vw,190px);height:clamp(38px,7vh,64px);margin:0 auto clamp(8px,1.8vh,16px);object-fit:contain}
+    .result-label{display:block;color:#8a6653;font-size:clamp(12px,1.8vw,17px);font-weight:800;letter-spacing:.16em}
+    #finalScore{display:block;margin:2px 0 clamp(10px,2vh,18px);color:#e94d31;font-size:clamp(56px,12vh,104px);line-height:.92;font-weight:900}
+    .player-name{width:100%;height:clamp(42px,8vh,56px);border:2px solid #ddb08d;border-radius:13px;background:#fff;color:#633622;text-align:center;font:800 clamp(15px,2vw,19px) system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;outline:none}
+    .player-name:focus{border-color:#ed5538;box-shadow:0 0 0 3px #ed553826}
+    .rank-block{margin:clamp(8px,1.6vh,14px) 0}.rank-value{display:block;margin-top:1px;color:#633622;font-size:clamp(27px,5vh,42px);line-height:1;font-weight:900}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.action{display:flex;min-height:clamp(42px,8vh,54px);align-items:center;justify-content:center;border-radius:14px;font:800 clamp(14px,1.8vw,17px) system-ui,sans-serif;letter-spacing:.04em;cursor:pointer}
+    #revive{border:0;background:#ed5538;color:#fff;box-shadow:0 5px 0 #bd3827}#restart{border:2px solid #d7a47d;background:#fff;color:#713c28}
+    @media (orientation:portrait){
+      #game{background:#fff}
+      .photo{width:100%;height:auto;inset:46% auto auto 0;object-fit:fill;transform:translateY(-50%)}
+      #basePhoto,#dirtCanvas{transform:translateY(-50%) scale(var(--dog-display-scale,1.55))}
+      #gameLogo{display:block;left:0;top:0;width:clamp(68px,20vw,92px);height:auto}
+      #score{top:max(20px,env(safe-area-inset-top));right:clamp(18px,5vw,30px);left:auto;font-size:clamp(64px,20vw,96px);font-weight:800;line-height:.9;color:#777;text-align:right}
+      #game.warning .warning-photo.active{animation:portraitHeadShake 180ms infinite alternate ease-in-out;transform-origin:58% 44%}
+      #game.eating #phasePhoto{animation:portraitEatingChew 1050ms ease-in-out both;transform-origin:58% 61%}
+    }
+    @keyframes portraitHeadShake{
+      0%{transform:translate(-9px,-50%) rotate(-1.1deg) scale(1.5686)}
+      100%{transform:translate(9px,-50%) rotate(1.1deg) scale(1.5686)}
+    }
+    @keyframes portraitEatingChew{
+      0%,18%{transform:translate(0,-50%) rotate(0) scale(1.55)}
+      33%{transform:translate(-8px,-50%) rotate(-.45deg) scale(1.5624)}
+      48%{transform:translate(8px,-50%) rotate(.45deg) scale(1.5686)}
+      63%{transform:translate(-6px,-50%) rotate(-.35deg) scale(1.5655)}
+      78%{transform:translate(6px,-50%) rotate(.35deg) scale(1.5686)}
+      100%{transform:translate(0,-50%) rotate(0) scale(1.55)}
+    }
+    @media (max-height:460px){.result-card{width:min(760px,96vw);padding:12px 24px}.result-logo{height:34px;margin-bottom:5px}#finalScore{font-size:54px;margin-bottom:7px}.player-name{height:40px}.rank-block{margin:6px 0}.rank-value{font-size:26px}.action{min-height:40px}}
+  </style>
+</head>
+<body>
+  <main id="game">
+    <img id="basePhoto" class="photo" src="asset/images/오늘도-이빨-닦기_가로형_기본무광-잔상제거-v3.png" alt="깨끗한 치아를 보이며 웃고 있는 골든 리트리버">
+    <canvas id="dirtCanvas" class="photo" width="1536" height="1024" aria-label="치아 오염 레이어"></canvas>
+    <img id="phasePhoto" class="photo" src="asset/images/phase-meal-dog.png" alt="사료와 채소를 웃으며 받아먹는 골든 리트리버">
+    <img id="warningPhotoA" class="photo warning-photo" src="asset/images/warning-dog.png" alt="입을 다물고 코를 찡그리며 옆눈질하는 경고 표정">
+    <img id="kissAttack" src="asset/images/kiss-dog.png" alt="눈을 가늘게 뜨고 가까이 다가와 뽀뽀하는 강아지">
+    <img id="lensSmear" src="asset/images/lens-smear.png" alt="렌즈 중앙에 넓게 묻은 투명한 침과 작은 음식물 자국">
+    <img id="gameLogo" src="asset/images/jayupet-logo-round.png" alt="JAYU PET"><div id="score">0</div><img id="brush" src="asset/images/jayupet-toothbrush-real-v1.png" alt="JAYU PET dental toothbrush"><div id="warning"></div>
+    <div id="phaseMeal" aria-hidden="true">
+      <i class="food-bit" style="--sx:25vw;--sy:-19vh;--delay:0ms"></i>
+      <i class="food-bit carrot" style="--sx:31vw;--sy:8vh;--delay:90ms"></i>
+      <i class="food-bit green" style="--sx:20vw;--sy:22vh;--delay:180ms"></i>
+      <i class="food-bit" style="--sx:-18vw;--sy:-15vh;--delay:260ms"></i>
+    </div>
+    <section id="fail">
+      <div class="result-card">
+        <button id="shareResult" type="button" aria-label="Share result" title="Share result"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m0 0L7 8m5-5 5 5M5 13v7h14v-7"/></svg></button>
+        <img class="result-logo" src="asset/images/jayupet-logo.png" alt="JAYU PET">
+        <span class="result-label">SCORE</span><strong id="finalScore">0</strong>
+        <input id="playerName" class="player-name" type="text" maxlength="14" placeholder="YOUR NAME" aria-label="YOUR NAME" autocomplete="nickname" spellcheck="false">
+        <div class="rank-block"><span class="result-label">RANK</span><strong id="rankValue" class="rank-value">#--</strong></div>
+        <div class="actions">
+          <button id="revive" class="action" type="button">REVIVE</button>
+          <button id="restart" class="action" type="button">PLAY AGAIN</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const pageOpenedAt=performance.now();
+    const game=document.querySelector('#game'), brush=document.querySelector('#brush'), scoreEl=document.querySelector('#score'),gameLogo=document.querySelector('#gameLogo');
+    const dirtCanvas=document.querySelector('#dirtCanvas'),dirtCtx=dirtCanvas.getContext('2d');
+    const fail=document.querySelector('#fail'), finalScore=document.querySelector('#finalScore'),playerName=document.querySelector('#playerName'),rankValue=document.querySelector('#rankValue'),phaseMeal=document.querySelector('#phaseMeal');
+    const warningPhotos=[document.querySelector('#warningPhotoA')];
+    const reviveButton=document.querySelector('#revive'),restartButton=document.querySelector('#restart'),shareResultButton=document.querySelector('#shareResult'),resultLogo=document.querySelector('.result-logo');
+    const buttonTapAudio=new Audio('asset/audio/button-tap-dog-bark.mp3');buttonTapAudio.preload='auto';buttonTapAudio.volume=.62;
+    const pantingAudio=new Audio('asset/audio/dog-panting-loop.wav');pantingAudio.preload='auto';pantingAudio.loop=true;pantingAudio.volume=.5;pantingAudio.playbackRate=.78;pantingAudio.preservesPitch=true;
+    const brushingAudio=new Audio('asset/audio/tooth-brushing-scrub.mp3');brushingAudio.preload='auto';brushingAudio.loop=false;brushingAudio.volume=1;
+    const warningAudio=new Audio('asset/audio/warning-angry-dog.mp3');warningAudio.preload='auto';warningAudio.volume=.55;
+    const eatingAudio=new Audio('asset/audio/dog-eating-crunch.mp3');eatingAudio.preload='auto';eatingAudio.volume=.82;
+    const kissAudio=new Audio('asset/audio/kiss-smooch.mp3');kissAudio.preload='auto';kissAudio.volume=.72;
+    const resultAudio=new Audio('asset/audio/result-sad-trombone.mp3');resultAudio.preload='auto';resultAudio.loop=false;resultAudio.volume=.25;
+    const reviveProductUrl='https://www.amazon.com/dp/B0BQCD1LVW?maas=maas_adg_4486914880E1C2A47999A7EA9F9D7236_afap_abs&ref_=aa_maas&tag=maas&utm_source=gtep&utm_medium=game&utm_campaign=jyp_us_gtep_dcb_game_260826_01';
+    const sourceImage={width:1536,height:1024};
+    const dirtyMasterSrc='asset/images/dirty-concept-v2-plaque-tartar-앞송곳니보강-잔상제거-v6.png';
+    const maskSources=[
+      'asset/images/zone-1-mask-exact-v6.png','asset/images/zone-2-mask-draft-v5.png','asset/images/zone-3-mask-draft-v1.png',
+      'asset/images/zone-4-mask-draft-v1.png','asset/images/zone-5-mask-draft-v1.png','asset/images/zone-6-mask-draft-v1.png',
+      'asset/images/zone-7-mask-draft-v1.png','asset/images/zone-8-mask-draft-v1.png','asset/images/zone-9-mask-draft-v1.png','asset/images/zone-10-mask-draft-v1.png'
+    ];
+    const zoneLayers=[],zoneHitData=[];
+    let assetsReady=false;
+    const cleanedTeeth=new Set();
+    const scrubProgress=new Float32Array(10),scrubStage=new Uint8Array(10),scrubDirectionX=new Float32Array(10),scrubDirectionY=new Float32Array(10),scrubSinceTurn=new Float32Array(10),scrubReversals=new Uint8Array(10);
+    function createRunId(){
+      const webCrypto=window.crypto||window.msCrypto;
+      if(typeof webCrypto?.randomUUID==='function')return webCrypto.randomUUID();
+      const bytes=new Uint8Array(16);
+      if(typeof webCrypto?.getRandomValues==='function')webCrypto.getRandomValues(bytes);
+      else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+      bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+      const hex=[...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
+      return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+    }
+    let dragging=false,warning=false,failing=false,transitioning=false,reviveUsed=false,warningAt=0,score=0,phase=1,timer,eatingSoundTimer,brushingStopTimer,brushingLoopFrame,audio,audioMaster,brushSound=false,brushContactActive=false,pantingActive=false,pantingStartedAt=0,brushingSource,brushingGain,eatingSource,eatingGain,breathScale=1,warningFrames=[],activeTooth=null,dragStart=null,scoreSubmitting=false,scoreSubmitted=false,runId=createRunId();
+    const analyticsSessionId=createRunId(),sentFunnelEvents=new Set(),pendingMetaEvents=[];
+    const campaignParams=new URLSearchParams(location.search);
+    let gameStartedAt=0,activePlayMs=0,activePlayStartedAt=0,playMilestoneFrame=0,nextPlayMilestone=0,metaPixelReady=false;
+    let previousBrushHead=null,contactZone=-1,contactDistance=0;
+    let warningBrushHead=null,warningContactZone=-1,warningContactDistance=0;
+    let logoX=Math.random()*120,logoY=0,logoVelocityX=(Math.random()<.5?-1:1)*(34+Math.random()*30),logoVelocityY=(Math.random()<.5?-1:1)*(30+Math.random()*26),logoLastFrame=performance.now();
+    const SCENE_ZOOM=1.55,BRUSH_CONTACT_DISTANCE=12,BRUSH_CONTACT_RADIUS=20,BRUSH_ROTATION=-50*Math.PI/180,BRUSH_SOUND_START=1.1,BRUSH_SOUND_END=2;
+    const SCRUB_REQUIRED=[58,54,36,36,50,50,48,36,36,54],SCRUB_OPACITY=[1,.65,.3];
+    function deviceType(){return matchMedia('(pointer:coarse)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)?'mobile':'desktop'}
+    function playTimeMs(){return activePlayMs+(activePlayStartedAt?Math.max(0,performance.now()-activePlayStartedAt):0)}
+    function pauseActivePlay(){if(!activePlayStartedAt)return;activePlayMs+=performance.now()-activePlayStartedAt;activePlayStartedAt=0}
+    function resumeActivePlay(){if(gameStartedAt&&!activePlayStartedAt&&!document.hidden&&!fail.classList.contains('show'))activePlayStartedAt=performance.now()}
+    function monitorPlayMilestones(){
+      const milestones=[[10000,'Play10Seconds'],[30000,'Play30Seconds'],[60000,'Play60Seconds']];
+      while(nextPlayMilestone<milestones.length&&playTimeMs()>=milestones[nextPlayMilestone][0])trackFunnelOnce(milestones[nextPlayMilestone++][1]);
+      if(nextPlayMilestone<milestones.length)playMilestoneFrame=requestAnimationFrame(monitorPlayMilestones);
+    }
+    function metaEventData(extra={}){
+      return {
+        play_time_seconds:Math.round(playTimeMs()/1000),score,phase,zones_cleaned:score,
+        device_type:deviceType(),utm_source:campaignParams.get('utm_source')||'',
+        utm_medium:campaignParams.get('utm_medium')||'',utm_campaign:campaignParams.get('utm_campaign')||'',
+        utm_content:campaignParams.get('utm_content')||'',...extra
+      };
+    }
+    function queueMetaEvent(eventName,data){
+      if(metaPixelReady&&typeof fbq==='function')fbq('trackCustom',eventName,data);
+      else pendingMetaEvents.push({eventName,data});
+    }
+    function trackFunnelOnce(eventName,extra={}){
+      if(sentFunnelEvents.has(eventName))return;
+      sentFunnelEvents.add(eventName);
+      const metaData=metaEventData(extra),payload={
+        eventName,sessionId:analyticsSessionId,runId,elapsedMs:Math.round(performance.now()-pageOpenedAt),playTimeMs:Math.round(playTimeMs()),
+        score,phase,zonesCleaned:score,deviceType:deviceType(),readyTimeMs:Number(extra.ready_time_ms)||0,
+        utmSource:campaignParams.get('utm_source')||'',utmMedium:campaignParams.get('utm_medium')||'',
+        utmCampaign:campaignParams.get('utm_campaign')||'',utmContent:campaignParams.get('utm_content')||''
+      };
+      fetch('/api/analytics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),keepalive:true}).catch(()=>{});
+      queueMetaEvent(eventName,metaData);
+    }
+    function installMetaPixel(pixelId){
+      if(metaPixelReady||!/^\d{5,30}$/.test(pixelId))return;
+      if(!window.fbq){
+        const fbq=function(){fbq.callMethod?fbq.callMethod.apply(fbq,arguments):fbq.queue.push(arguments)};
+        window.fbq=fbq;window._fbq=fbq;fbq.push=fbq;fbq.loaded=true;fbq.version='2.0';fbq.queue=[];
+        const script=document.createElement('script');script.async=true;script.src='https://connect.facebook.net/en_US/fbevents.js';
+        document.head.appendChild(script);
+      }
+      fbq('init',pixelId);fbq('track','PageView');metaPixelReady=true;
+      pendingMetaEvents.splice(0).forEach(({eventName,data})=>fbq('trackCustom',eventName,data));
+    }
+    async function initTracking(){
+      try{const response=await fetch('/api/config',{cache:'no-store'}),data=await response.json();if(response.ok&&data.metaPixelId)installMetaPixel(data.metaPixelId)}catch(error){console.warn('Meta Pixel configuration unavailable.',error)}
+    }
+    function startGameTracking(){
+      if(gameStartedAt)return;
+      gameStartedAt=performance.now();activePlayStartedAt=gameStartedAt;trackFunnelOnce('GameStart');monitorPlayMilestones();
+    }
+    function imageLayout(){
+      const w=innerWidth,h=innerHeight,isPortrait=h>w,baseScale=isPortrait?w/sourceImage.width:Math.max(w/sourceImage.width,h/sourceImage.height),scale=baseScale*SCENE_ZOOM*breathScale;
+      return {scale,ox:(w-sourceImage.width*scale)/2,oy:(h-sourceImage.height*scale)/2-(isPortrait?h*.04:0)};
+    }
+    function animateGameLogo(now){
+      const elapsed=Math.min(.05,(now-logoLastFrame)/1000);logoLastFrame=now;
+      if(innerHeight>innerWidth){
+        const logoRect=gameLogo.getBoundingClientRect(),logoWidth=logoRect.width||80,logoHeight=logoRect.height||80;
+        const photoBottom=document.querySelector('#basePhoto').getBoundingClientRect().bottom;
+        const minX=8,maxX=Math.max(minX,innerWidth-logoWidth-8),minY=Math.min(innerHeight-logoHeight-8,photoBottom+8),maxY=Math.max(minY,innerHeight-logoHeight-8);
+        if(!logoY)logoY=minY+Math.random()*Math.max(1,maxY-minY);
+        logoX+=logoVelocityX*elapsed;logoY+=logoVelocityY*elapsed;
+        if(logoX<=minX){logoX=minX;logoVelocityX=34+Math.random()*30;logoVelocityY+=(Math.random()-.5)*18}
+        else if(logoX>=maxX){logoX=maxX;logoVelocityX=-(34+Math.random()*30);logoVelocityY+=(Math.random()-.5)*18}
+        if(logoY<=minY){logoY=minY;logoVelocityY=30+Math.random()*26;logoVelocityX+=(Math.random()-.5)*18}
+        else if(logoY>=maxY){logoY=maxY;logoVelocityY=-(30+Math.random()*26);logoVelocityX+=(Math.random()-.5)*18}
+        logoVelocityX=Math.sign(logoVelocityX||1)*Math.min(82,Math.max(24,Math.abs(logoVelocityX)));
+        logoVelocityY=Math.sign(logoVelocityY||1)*Math.min(74,Math.max(22,Math.abs(logoVelocityY)));
+        gameLogo.style.transform=`translate3d(${logoX}px,${logoY}px,0)`;
+      }
+      updateDogBreathing();
+      requestAnimationFrame(animateGameLogo);
+    }
+    function updateDogBreathing(){
+      let target=1;
+      if(pantingActive&&!warning&&!transitioning&&!failing){
+        const soundTime=pantingAudio.currentTime>0?pantingAudio.currentTime:(performance.now()-pantingStartedAt)/1000;
+        const wave=(Math.sin(soundTime*Math.PI*2/1.15-Math.PI/2)+1)/2;
+        target=1+Math.pow(wave,1.25)*.05;
+      }
+      breathScale+=(target-breathScale)*(target>breathScale?.42:.24);
+      game.style.setProperty('--dog-display-scale',(SCENE_ZOOM*breathScale).toFixed(4));
+    }
+    function loadImage(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=src})}
+    function alphaMaskFromImage(maskImage){
+      const work=document.createElement('canvas');work.width=sourceImage.width;work.height=sourceImage.height;
+      const workCtx=work.getContext('2d',{willReadFrequently:true});workCtx.drawImage(maskImage,0,0,work.width,work.height);
+      const pixels=workCtx.getImageData(0,0,work.width,work.height),data=pixels.data,hit=new Uint8Array(work.width*work.height);
+      for(let pixel=0,index=0;pixel<data.length;pixel+=4,index++){
+        const alpha=data[pixel];hit[index]=alpha;data[pixel]=255;data[pixel+1]=255;data[pixel+2]=255;data[pixel+3]=alpha;
+      }
+      workCtx.putImageData(pixels,0,0);return {canvas:work,hit};
+    }
+    async function prepareDirtyLayers(){
+      const [dirtyMaster,...maskImages]=await Promise.all([loadImage(dirtyMasterSrc),...maskSources.map(loadImage)]);
+      for(const maskImage of maskImages){
+        const mask=alphaMaskFromImage(maskImage),layer=document.createElement('canvas');layer.width=sourceImage.width;layer.height=sourceImage.height;
+        const layerCtx=layer.getContext('2d');layerCtx.drawImage(dirtyMaster,0,0,layer.width,layer.height);
+        layerCtx.globalCompositeOperation='destination-in';layerCtx.drawImage(mask.canvas,0,0);layerCtx.globalCompositeOperation='source-over';
+        zoneLayers.push(layer);zoneHitData.push(mask.hit);
+      }
+      assetsReady=true;drawDirtyLayer();trackFunnelOnce('GameReady',{ready_time_ms:Math.round(performance.now()-pageOpenedAt)});
+    }
+    function drawDirtyLayer(){
+      dirtCtx.clearRect(0,0,sourceImage.width,sourceImage.height);
+      if(!assetsReady)return;
+      zoneLayers.forEach((layer,index)=>{
+        if(cleanedTeeth.has(index))return;
+        dirtCtx.globalAlpha=SCRUB_OPACITY[scrubStage[index]];
+        dirtCtx.drawImage(layer,0,0);
+      });
+      dirtCtx.globalAlpha=1;
+      // Never allow a generated dirty master to paint beyond the real lower lip tip.
+      // Clearing the overlay reveals the clean base below without a color seam.
+      dirtCtx.clearRect(1040,600,sourceImage.width-1040,sourceImage.height-600);
+    }
+    function findZoneAt(x,y,includeCleaned=false){
+      if(!assetsReady)return -1;
+      const {scale,ox,oy}=imageLayout(),sourceX=Math.floor((x-ox)/scale),sourceY=Math.floor((y-oy)/scale);
+      if(sourceX<0||sourceY<0||sourceX>=sourceImage.width||sourceY>=sourceImage.height)return -1;
+      const pixelIndex=sourceY*sourceImage.width+sourceX;
+      for(let zone=0;zone<zoneHitData.length;zone++)if((includeCleaned||!cleanedTeeth.has(zone))&&zoneHitData[zone][pixelIndex]>80)return zone;
+      return -1;
+    }
+    function findZoneInBrushArea(x,y,includeCleaned=false,preferredZone=-1){
+      if(!assetsReady)return -1;
+      const {scale,ox,oy}=imageLayout(),sourceX=(x-ox)/scale,sourceY=(y-oy)/scale,radius=BRUSH_CONTACT_RADIUS/scale;
+      const offsets=[[0,0],[-1,0],[1,0],[0,-1],[0,1],[-.7,-.7],[.7,-.7],[-.7,.7],[.7,.7],[-.5,0],[.5,0],[0,-.5],[0,.5]];
+      const overlaps=new Uint8Array(zoneHitData.length);
+      for(const [dx,dy] of offsets){
+        const px=Math.round(sourceX+dx*radius),py=Math.round(sourceY+dy*radius);
+        if(px<0||py<0||px>=sourceImage.width||py>=sourceImage.height)continue;
+        const pixelIndex=py*sourceImage.width+px;
+        for(let zone=0;zone<zoneHitData.length;zone++)if((includeCleaned||!cleanedTeeth.has(zone))&&zoneHitData[zone][pixelIndex]>55)overlaps[zone]++;
+      }
+      if(preferredZone>=0&&overlaps[preferredZone]>0)return preferredZone;
+      let bestZone=-1,bestOverlap=0;
+      overlaps.forEach((overlap,zone)=>{if(overlap>bestOverlap){bestOverlap=overlap;bestZone=zone}});
+      return bestZone;
+    }
+    function findTooth(x,y,preferredZone=-1){return findZoneInBrushArea(x,y,false,preferredZone)}
+    function addScrubMotion(zone,dx,dy){
+      const rawDistance=Math.hypot(dx,dy),distance=Math.min(10,rawDistance);if(rawDistance<.8)return false;
+      const directionX=dx/rawDistance,directionY=dy/rawDistance,hasDirection=scrubDirectionX[zone]||scrubDirectionY[zone];
+      if(hasDirection&&directionX*scrubDirectionX[zone]+directionY*scrubDirectionY[zone]<-.35&&scrubSinceTurn[zone]>=7){
+        scrubReversals[zone]+=1;scrubSinceTurn[zone]=0;
+      }else scrubSinceTurn[zone]+=distance;
+      scrubDirectionX[zone]=directionX;scrubDirectionY[zone]=directionY;scrubProgress[zone]+=distance;
+      const ratio=scrubProgress[zone]/SCRUB_REQUIRED[zone],nextStage=ratio>=.62?2:ratio>=.25?1:0;
+      if(nextStage!==scrubStage[zone]){scrubStage[zone]=nextStage;drawDirtyLayer()}
+      return ratio>=1&&scrubReversals[zone]>=1;
+    }
+    function cleanOneToothAt(x,y,preferredZone=-1){
+      const zone=findTooth(x,y,preferredZone);if(zone<0||cleanedTeeth.has(zone))return false;
+      cleanedTeeth.add(zone);drawDirtyLayer();score+=1;scoreEl.textContent=score;trackFunnelOnce('FirstZoneCleaned');
+      if(cleanedTeeth.size===maskSources.length)startNextPhase();
+      return true;
+    }
+    function positionPhaseMeal(){
+      const {scale,ox,oy}=imageLayout();
+      phaseMeal.style.setProperty('--mouth-x',`${ox+900*scale}px`);phaseMeal.style.setProperty('--mouth-y',`${oy+600*scale}px`);
+    }
+    function startNextPhase(){
+      if(transitioning||failing)return;transitioning=true;clearTimeout(timer);warning=false;clearWarningFrames();game.classList.remove('warning');endBrushDrag();positionPhaseMeal();
+      trackFunnelOnce('FirstPhaseComplete');
+      pausePanting();
+      playEatingSound();
+      game.classList.remove('eating');void game.offsetWidth;game.classList.add('eating');
+      setTimeout(()=>{stopEatingSound();cleanedTeeth.clear();scrubProgress.fill(0);scrubStage.fill(0);scrubDirectionX.fill(0);scrubDirectionY.fill(0);scrubSinceTurn.fill(0);scrubReversals.fill(0);drawDirtyLayer();phase+=1;game.classList.remove('eating');transitioning=false;moveBrush({clientX:innerWidth*.94,clientY:innerHeight*.62});playPanting();scheduleWarning()},3000);
+    }
+    function brushAnchorPoint(pointerX,pointerY){
+      const assistStart=innerWidth*.78,progress=Math.max(0,Math.min(1,(pointerX-assistStart)/(innerWidth-assistStart||1)));
+      const eased=progress*progress*(3-2*progress),maxReach=Math.min(190,innerWidth*.22);
+      return {x:pointerX+eased*maxReach,y:pointerY};
+    }
+    function moveBrush(e){
+      const p=e.touches?.[0]||e,anchor=brushAnchorPoint(p.clientX,p.clientY);
+      brush.style.left=anchor.x+'px';brush.style.top=anchor.y+'px';return anchor;
+    }
+    function brushHeadPoint(pointerX,pointerY){
+      const style=getComputedStyle(brush),width=parseFloat(style.width)||52,height=parseFloat(style.height)||340;
+      const localX=(.44-.5)*width,localY=(.05-.28)*height;
+      return {
+        x:pointerX+localX*Math.cos(BRUSH_ROTATION)-localY*Math.sin(BRUSH_ROTATION),
+        y:pointerY+localX*Math.sin(BRUSH_ROTATION)+localY*Math.cos(BRUSH_ROTATION)
+      };
+    }
+    function initAudio(){
+      if(!audio){
+        audio=new (window.AudioContext||window.webkitAudioContext)();audioMaster=audio.createGain();audioMaster.gain.value=1;audioMaster.connect(audio.destination);
+        brushingSource=audio.createMediaElementSource(brushingAudio);brushingGain=audio.createGain();brushingGain.gain.value=1.05;brushingSource.connect(brushingGain).connect(audioMaster);
+        eatingSource=audio.createMediaElementSource(eatingAudio);eatingGain=audio.createGain();eatingGain.gain.value=1.4;eatingSource.connect(eatingGain).connect(audioMaster);
+      }
+      if(audio.state==='suspended')audio.resume().then(playPanting).catch(()=>{});
+      playPanting();return audio;
+    }
+    function noiseBuffer(duration=.3){
+      initAudio();const length=Math.max(1,Math.floor(audio.sampleRate*duration)),buffer=audio.createBuffer(1,length,audio.sampleRate),data=buffer.getChannelData(0);
+      for(let i=0;i<length;i++)data[i]=Math.random()*2-1;return buffer;
+    }
+    function noiseBurst({duration=.2,volume=.12,frequency=900,when=0,type='bandpass'}={}){
+      initAudio();const now=audio.currentTime+when,src=audio.createBufferSource(),filter=audio.createBiquadFilter(),gain=audio.createGain();
+      src.buffer=noiseBuffer(duration);filter.type=type;filter.frequency.value=frequency;filter.Q.value=1.2;gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(volume,now+.025);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);
+      src.connect(filter).connect(gain).connect(audioMaster);src.start(now);src.stop(now+duration+.02);
+    }
+    function playPanting(){
+      if(warning||transitioning||failing||fail.classList.contains('show'))return;
+      if(!pantingActive)pantingStartedAt=performance.now();
+      pantingActive=true;
+      pantingAudio.play().catch(()=>{});
+    }
+    function pausePanting(){pantingActive=false;pantingAudio.pause()}
+    function monitorBrushingLoop(){
+      cancelAnimationFrame(brushingLoopFrame);
+      if(!brushContactActive||!dragging||brushingAudio.paused)return;
+      if(brushingAudio.currentTime>=BRUSH_SOUND_END-.025)brushingAudio.currentTime=BRUSH_SOUND_START;
+      brushingLoopFrame=requestAnimationFrame(monitorBrushingLoop);
+    }
+    function playBrushingSegment(){
+      if(!brushContactActive||!dragging||!audio||audio.state==='suspended')return;
+      brushSound=true;
+      if(brushingAudio.paused){
+        brushingAudio.currentTime=BRUSH_SOUND_START;
+        brushingAudio.play().then(monitorBrushingLoop).catch(()=>{brushSound=false});
+      }else monitorBrushingLoop();
+    }
+    function setBrushing(active){
+      const shouldPlay=Boolean(active&&dragging);
+      if(!shouldPlay){
+        clearTimeout(brushingStopTimer);
+        brushingStopTimer=setTimeout(()=>{if(!brushContactActive)stopBrushingSound()},120);
+        brushContactActive=false;
+        return;
+      }
+      clearTimeout(brushingStopTimer);
+      brushContactActive=true;
+      if(!brushSound)playBrushingSegment();
+    }
+    function stopBrushingSound(){clearTimeout(brushingStopTimer);cancelAnimationFrame(brushingLoopFrame);brushContactActive=false;brushSound=false;brushingAudio.pause();brushingAudio.currentTime=0}
+    brushingAudio.addEventListener('ended',()=>{brushSound=false});
+    function tone(frequency,duration,when=0,volume=.12,type='sine',endFrequency=frequency){
+      initAudio();const now=audio.currentTime+when,osc=audio.createOscillator(),gain=audio.createGain();osc.type=type;osc.frequency.setValueAtTime(frequency,now);osc.frequency.exponentialRampToValueAtTime(Math.max(20,endFrequency),now+duration);gain.gain.setValueAtTime(.0001,now);gain.gain.exponentialRampToValueAtTime(volume,now+.015);gain.gain.exponentialRampToValueAtTime(.0001,now+duration);osc.connect(gain).connect(audioMaster);osc.start(now);osc.stop(now+duration+.02);
+    }
+    function playEatingSound(){
+      clearTimeout(eatingSoundTimer);eatingAudio.pause();eatingAudio.currentTime=0;eatingAudio.play().catch(()=>{});
+      eatingSoundTimer=setTimeout(stopEatingSound,3000);
+    }
+    function stopEatingSound(){clearTimeout(eatingSoundTimer);eatingAudio.pause();eatingAudio.currentTime=0}
+    function playKissSound(){kissAudio.pause();kissAudio.currentTime=0;kissAudio.play().catch(()=>{})}
+    function playResultJingle(){resultAudio.pause();resultAudio.currentTime=0;resultAudio.play().catch(()=>{})}
+    function stopResultJingle(){resultAudio.pause();resultAudio.currentTime=0}
+    function playButtonSound(){buttonTapAudio.pause();buttonTapAudio.currentTime=0;buttonTapAudio.play().catch(()=>{})}
+    function growl(){
+      warningAudio.pause();warningAudio.currentTime=0;warningAudio.play().catch(()=>{});
+    }
+    function stopWarningSound(){warningAudio.pause();warningAudio.currentTime=0}
+    function showWarningFrame(index){warningPhotos.forEach((photo,i)=>photo.classList.toggle('active',i===index))}
+    function clearWarningFrames(){warningFrames.forEach(clearTimeout);warningFrames=[];warningPhotos.forEach(photo=>photo.classList.remove('active'))}
+    function startWarning(){
+      if(transitioning||failing)return;
+      warning=true;warningAt=performance.now();warningBrushHead=null;warningContactZone=-1;warningContactDistance=0;
+      stopBrushingSound();pausePanting();game.classList.add('warning');showWarningFrame(0);growl();
+      timer=setTimeout(()=>{warning=false;stopWarningSound();clearWarningFrames();game.classList.remove('warning');playPanting();scheduleWarning()},2000)
+    }
+    function scheduleWarning(){clearTimeout(timer);if(!transitioning&&!failing)timer=setTimeout(startWarning,2200+Math.random()*1800)}
+    function resultScore(){return score}
+    function updateRank(){if(!scoreSubmitted)rankValue.textContent='#--'}
+    async function submitScore(){
+      const name=playerName.value.trim();
+      if(!name||scoreSubmitting||scoreSubmitted){updateRank();return}
+      scoreSubmitting=true;rankValue.textContent='...';
+      try{
+        const response=await fetch('/api/scores',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,score:resultScore(),runId})});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error||'Score submission failed.');
+        scoreSubmitted=true;playerName.value=data.name;playerName.readOnly=true;rankValue.textContent=`#${data.rank}`;
+      }catch(error){console.error('점수를 저장하지 못했습니다.',error);rankValue.textContent='RETRY'}
+      finally{scoreSubmitting=false}
+    }
+    function roundedRect(ctx,x,y,width,height,radius){
+      const r=Math.min(radius,width/2,height/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+width,y,x+width,y+height,r);ctx.arcTo(x+width,y+height,x,y+height,r);ctx.arcTo(x,y+height,x,y,r);ctx.arcTo(x,y,x+width,y,r);ctx.closePath();
+    }
+    function drawContained(ctx,image,x,y,width,height){
+      const scale=Math.min(width/image.naturalWidth,height/image.naturalHeight),drawWidth=image.naturalWidth*scale,drawHeight=image.naturalHeight*scale;
+      ctx.drawImage(image,x+(width-drawWidth)/2,y+(height-drawHeight)/2,drawWidth,drawHeight);
+    }
+    async function createResultImage(){
+      if(!resultLogo.complete)await resultLogo.decode().catch(()=>{});
+      const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1350;const ctx=canvas.getContext('2d');
+      const gradient=ctx.createRadialGradient(540,180,40,540,620,900);gradient.addColorStop(0,'#fffaf0');gradient.addColorStop(.56,'#f8e7c9');gradient.addColorStop(1,'#efc89f');ctx.fillStyle=gradient;ctx.fillRect(0,0,canvas.width,canvas.height);
+      roundedRect(ctx,80,65,920,1220,42);ctx.fillStyle='rgba(255,250,242,.97)';ctx.fill();ctx.lineWidth=7;ctx.strokeStyle='#ed5538';ctx.stroke();
+      if(resultLogo.naturalWidth)drawContained(ctx,resultLogo,310,115,460,170);
+      ctx.textAlign='center';ctx.fillStyle='#8a6653';ctx.font='800 31px system-ui, sans-serif';ctx.fillText('SCORE',540,345);
+      ctx.fillStyle='#e94d31';ctx.font='900 210px system-ui, sans-serif';ctx.fillText(String(resultScore()),540,555);
+      roundedRect(ctx,175,620,730,120,25);ctx.fillStyle='#fff';ctx.fill();ctx.lineWidth=5;ctx.strokeStyle='#ddb08d';ctx.stroke();
+      ctx.fillStyle='#633622';ctx.font='800 45px system-ui, sans-serif';ctx.fillText((playerName.value.trim()||'YOUR NAME').toUpperCase(),540,698);
+      ctx.fillStyle='#8a6653';ctx.font='800 31px system-ui, sans-serif';ctx.fillText('RANK',540,825);
+      ctx.fillStyle='#633622';ctx.font='900 94px system-ui, sans-serif';ctx.fillText(rankValue.textContent||'#--',540,930);
+      ctx.fillStyle='#bd1e2d';ctx.font='900 46px system-ui, sans-serif';ctx.fillText('brush-jayupet',540,1090);
+      ctx.fillStyle='#8a6653';ctx.font='600 27px system-ui, sans-serif';ctx.fillText('brush-jayupet.vercel.app',540,1150);
+      return new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Unable to create result image.')),'image/png'));
+    }
+    function downloadResultImage(blob){
+      const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`brush-jayupet-score-${resultScore()}.png`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+    async function shareResult(){
+      if(playerName.value.trim()&&!scoreSubmitted)await submitScore();
+      const blob=await createResultImage(),file=new File([blob],`brush-jayupet-score-${resultScore()}.png`,{type:'image/png'});
+      if(navigator.share&&navigator.canShare?.({files:[file]})){
+        try{await navigator.share({title:'brush-jayupet',text:`My score: ${resultScore()}\nhttps://brush-jayupet.vercel.app`,files:[file]});return}catch(error){if(error.name==='AbortError')return}
+      }
+      downloadResultImage(blob);
+    }
+    function die(){
+      if(failing)return;failing=true;clearTimeout(timer);clearWarningFrames();dragging=false;warning=false;
+      pauseActivePlay();trackFunnelOnce('GameOver');
+      stopBrushingSound();stopWarningSound();pausePanting();
+      game.classList.remove('warning');game.classList.add('kiss-fail');finalScore.textContent=resultScore();
+      reviveButton.hidden=reviveUsed;reviveButton.parentElement.style.gridTemplateColumns=reviveUsed?'1fr':'1fr 1fr';
+      if(navigator.vibrate)navigator.vibrate(70);
+      setTimeout(playKissSound,520);setTimeout(()=>{fail.classList.add('show');trackFunnelOnce('ResultViewed');if(!reviveUsed)trackFunnelOnce('AmazonCtaViewed');playResultJingle()},1050);
+    }
+    function onMove(e){
+      const anchor=moveBrush(e);if(!dragging)return;e.preventDefault();
+      if(warning){
+        const head=brushHeadPoint(anchor.x,anchor.y),elapsed=performance.now()-warningAt;
+        if(elapsed<=250){warningBrushHead=head;warningContactZone=-1;warningContactDistance=0;return}
+        const zone=findZoneInBrushArea(head.x,head.y,true,warningContactZone);if(zone>=0)trackFunnelOnce('FirstBrushContact');
+        setBrushing(zone>=0);
+        if(zone>=0&&zone===warningContactZone&&warningBrushHead){
+          warningContactDistance+=Math.hypot(head.x-warningBrushHead.x,head.y-warningBrushHead.y);
+        }else{warningContactZone=zone;warningContactDistance=0}
+        warningBrushHead=head;
+        if(zone>=0&&warningContactDistance>=BRUSH_CONTACT_DISTANCE){die();return}
+        return;
+      }
+      if(!warning){
+        const head=brushHeadPoint(anchor.x,anchor.y),zone=findTooth(head.x,head.y,contactZone);if(zone>=0)trackFunnelOnce('FirstBrushContact');
+        setBrushing(zone>=0);
+        let scrubComplete=false;
+        if(zone>=0&&zone===contactZone&&previousBrushHead) scrubComplete=addScrubMotion(zone,head.x-previousBrushHead.x,head.y-previousBrushHead.y);
+        else{contactZone=zone;contactDistance=0}
+        previousBrushHead=head;
+        if(zone>=0&&scrubComplete&&cleanOneToothAt(head.x,head.y,zone)){
+          contactZone=-1;contactDistance=0;
+        }
+      }
+    }
+    game.addEventListener('pointerdown',e=>{if(fail.classList.contains('show')||transitioning)return;startGameTracking();playPanting();initAudio();dragging=true;activeTooth=null;dragStart={x:e.clientX,y:e.clientY};const anchor=moveBrush(e);previousBrushHead=brushHeadPoint(anchor.x,anchor.y);contactZone=findTooth(previousBrushHead.x,previousBrushHead.y);if(contactZone>=0)trackFunnelOnce('FirstBrushContact');contactDistance=0;if(!timer)scheduleWarning()});
+    function endBrushDrag(){stopBrushingSound();dragging=false;activeTooth=null;dragStart=null;previousBrushHead=null;contactZone=-1;contactDistance=0;warningBrushHead=null;warningContactZone=-1;warningContactDistance=0}
+    game.addEventListener('pointermove',onMove);addEventListener('pointerup',endBrushDrag);addEventListener('pointercancel',endBrushDrag);
+    restartButton.addEventListener('click',()=>{initAudio();stopResultJingle();playButtonSound();setTimeout(()=>location.reload(),90)});
+    shareResultButton.addEventListener('click',()=>{trackFunnelOnce('ShareResult');initAudio();playButtonSound();shareResult().catch(error=>console.error('결과를 공유하지 못했습니다.',error))});
+    playerName.addEventListener('input',updateRank);
+    playerName.addEventListener('blur',submitScore);
+    playerName.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitScore();playerName.blur()}});
+    reviveButton.addEventListener('click',()=>{if(reviveUsed)return;trackFunnelOnce('AmazonOutboundClick');reviveUsed=true;initAudio();stopResultJingle();playButtonSound();window.open(reviveProductUrl,'_blank','noopener,noreferrer');fail.classList.remove('show');game.classList.remove('kiss-fail');failing=false;warning=false;scoreSubmitted=false;scoreSubmitting=false;runId=createRunId();playerName.readOnly=false;rankValue.textContent='#--';endBrushDrag();moveBrush({clientX:innerWidth*.94,clientY:innerHeight*.62});resumeActivePlay();playPanting();scheduleWarning()});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseActivePlay();else resumeActivePlay()});
+    trackFunnelOnce('LandingView');initTracking();
+    prepareDirtyLayers().catch(error=>{console.error('오염 레이어를 불러오지 못했습니다.',error)});
+    moveBrush({clientX:innerWidth*.94,clientY:innerHeight*.62});
+    requestAnimationFrame(animateGameLogo);
+    addEventListener('resize',()=>{if(transitioning)positionPhaseMeal()});
+  </script>
+</body>
+</html>

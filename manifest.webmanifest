@@ -1,0 +1,17 @@
+{
+  "name": "brush-jayupet",
+  "short_name": "brush-jayupet",
+  "description": "Brush your dog's teeth and climb the JAYU PET ranking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#bd1e2d",
+  "icons": [
+    {
+      "src": "asset/images/jayupet-logo-round.png",
+      "sizes": "1000x1000",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
